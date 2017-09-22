@@ -1,0 +1,46 @@
+<?php
+
+use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Session\AccountInterface;
+
+/**
+ * Implements hook_form_BASE_FORM_ID_alter() for
+ * commerce_order_item_add_to_cart_form.
+ */
+function commerce_product_permissions_by_type_form_commerce_order_item_add_to_cart_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  $storage = $form_state->getStorage();
+  if (isset($storage['product'])) {
+    /** @var \Drupal\commerce_product\Entity\ProductInterface $product */
+    $product = $storage['product'];
+    $account = Drupal::currentUser();
+
+    $permission = 'add ' . $product->bundle() . ' commerce_product to cart';
+    $access = AccessResult::allowedIfHasPermission($account, $permission);
+
+    // Hide the entire add to cart form if appropriate.
+    if (!$access->isAllowed()) {
+      $form['#access'] = FALSE;
+    }
+
+    // This form's cacheability may have been changed as it is now based
+    // on the current user and permissions.
+    // TODO: is this line enough?
+    $access->addCacheableDependency($form);
+  }
+}
+
+/**
+ * Implements hook_ENTITY_TYPE_access() for 'commerce_product' entities.
+ *
+ * Drupal\entity\EntityAccessControlHandler::checkEntityPermissions doesn't
+ * check for per-bundle permissions if $operation is 'view', so do that here.
+ */
+function commerce_product_permissions_by_type_commerce_product_access(EntityInterface $entity, $operation, AccountInterface $account) {
+  if ($operation === 'view') {
+    $permission = "view {$entity->bundle()} {$entity->getEntityTypeId()}";
+    return AccessResult::allowedIfHasPermission($account, $permission);
+  }
+  return AccessResult::neutral();
+}
